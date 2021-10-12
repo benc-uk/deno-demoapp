@@ -1,0 +1,97 @@
+<%- await include(`${viewDir}/inc/header.ejs`) %>
+
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.1.0/chart.min.js"
+  integrity="sha512-RGbSeD/jDcZBWNsI1VCvdjcDULuSfWTtIva2ek5FtteXeSjLfXac4kqkDRHVGf1TwsXCAqPTF7/EYITD0/CTqw=="
+  crossorigin="anonymous"
+></script>
+
+<p class="card-text">
+  <canvas id="cpuChart" width="500" height="200" style="background-color: white"></canvas>
+  <canvas id="memChart" width="500" height="200" style="background-color: white"></canvas>
+</p>
+
+<script>
+  const DATA_INTERVAL = 3000
+  const MIB = 2014 * 1024
+  const metricApiEndpoint = '/api/metrics'
+  let memChart, cpuChart
+
+  // Initialize CPU load chart
+  cpuChart = new Chart(document.getElementById('cpuChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Processor Load (%)',
+          data: [],
+          borderColor: 'rgba(19, 185, 85, 1.0)',
+          backgroundColor: 'rgba(19, 185, 85, 0.3)',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    },
+    options: {
+      scales: {
+        y: {
+          min: 0,
+        },
+      },
+    },
+  })
+
+  // memory chart
+  memChart = new Chart(document.getElementById('memChart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Memory Free',
+          data: [],
+          borderColor: 'rgba(220, 20, 20, 1.0)',
+          backgroundColor: 'rgba(220, 20, 20, 0.3)',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    },
+  })
+
+  updateCharts()
+  setInterval(updateCharts, DATA_INTERVAL)
+
+  // Fetch data from API
+  async function updateCharts() {
+    try {
+      const resp = await fetch(metricApiEndpoint)
+      if (!resp.ok) throw `Call to ${metricApiEndpoint} returned ${resp.statusText}`
+      const data = await resp.json()
+      console.log(data)
+      addData(cpuChart, new Date().toTimeString().substr(0, 8), [data.load[0] * 100])
+      addData(memChart, new Date().toTimeString().substr(0, 8), [data.memoryFree / MIB])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Helper to dynamically add data to a chart
+  function addData(chart, label, data) {
+    chart.data.labels.push(label)
+    for (let ds = 0; ds < chart.data.datasets.length; ds++) {
+      chart.data.datasets[ds].data.push(data[ds])
+    }
+
+    // Limit the charts at 30 data points, otherwise it would just fill up
+    if (chart.data.datasets[0].data.length > 30) {
+      chart.data.datasets[0].data.shift()
+      chart.data.labels.shift()
+    }
+    chart.update()
+  }
+</script>
+<%- await include(`${viewDir}/inc/footer.ejs`) %>
